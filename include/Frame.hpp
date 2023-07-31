@@ -56,6 +56,9 @@ Frame::Frame(const wxString& title)
 
   SelectColorPane(colorPanes[0]);
   SelectPenPane(penPanes[0]);
+
+  wxIcon icon("logo.png", wxBITMAP_TYPE_PNG);
+  SetIcon(icon);
 }
 
 void Frame::SetupColorPanes(wxWindow* parent, wxSizer* sizer)
