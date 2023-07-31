@@ -8,6 +8,7 @@
 #include "ColorPane.hpp"
 #include "PenSizePane.hpp"
 #include "DrawingCanvas.hpp"
+#include "XmlSerializer.hpp"
 
 class Frame: public wxFrame
 {
@@ -20,11 +21,14 @@ private:
   void SetupPenPanes(wxWindow* parent, wxSizer* sizer);
   void SelectColorPane(ColorPane* pane);
   void SelectPenPane(PenSizePane* pane);
+  void LoadFromXml();
+  void SaveToXml();
 
   std::vector<ColorPane*> colorPanes{};
   std::vector<PenSizePane*> penPanes{};
 
   DrawingCanvas* canvas;
+  XmlSerializer serializer{};
 
   const std::string lightBackground = "#f4f3f3";
   const std::string darkBackground = "#2c2828";
@@ -47,7 +51,7 @@ Frame::Frame(const wxString& title)
   splitter->SplitVertically(controlsPanel, canvas);
   splitter->SetSashPosition(FromDIP(220));
 
-  this->SetSize(FromDIP(800), FromDIP(500));
+  this->SetSize(FromDIP(1000), FromDIP(700));
   this->SetMinSize(wxSize(FromDIP(400), FromDIP(200)));
 
   SelectColorPane(colorPanes[0]);
@@ -108,11 +112,23 @@ wxPanel* Frame::BuildControlsPanel(wxWindow* parent)
   SetupPenPanes(controlsPanel, penPaneSizer);
   mainSizer->Add(penPaneSizer, 0, wxALL, FromDIP(5));
 
-  // Add 'Save As' button
-  auto button = new wxButton(controlsPanel, wxID_ANY, "Save As");
-  button->SetCursor(wxCursor(wxCURSOR_HAND));
+  // Buttons
+  auto exportButton = new wxButton(controlsPanel, wxID_ANY, "Export");
+  exportButton->SetCursor(wxCursor(wxCURSOR_HAND));
+  exportButton->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) { canvas->ShowExportDialog(); });
+  
+  auto saveButton = new wxButton(controlsPanel, wxID_ANY, "Save As");
+  saveButton->SetCursor(wxCursor(wxCURSOR_HAND));
+  saveButton->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) { SaveToXml(); });
+  
+  auto loadButton = new wxButton(controlsPanel, wxID_ANY, "Load");
+  loadButton->SetCursor(wxCursor(wxCURSOR_HAND));
+  loadButton->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) { LoadFromXml(); });
+  
   mainSizer->AddStretchSpacer();
-  mainSizer->Add(button, 0, wxALL, FromDIP(5));
+  mainSizer->Add(exportButton, 0, wxALL, FromDIP(5));
+  mainSizer->Add(saveButton, 0, wxALL, FromDIP(5));
+  mainSizer->Add(loadButton, 0, wxALL, FromDIP(5));
   mainSizer->AddSpacer(FromDIP(5));
 
   controlsPanel->SetSizer(mainSizer);
@@ -140,4 +156,28 @@ void Frame::SelectPenPane(PenSizePane* pane)
   }
 
   canvas->currentWidth = pane->penWidth;
+}
+
+void Frame::LoadFromXml()
+{
+  wxFileDialog dialog(this, "Load", "", "", "PXZ files (*.pxz)|*.pxz", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+  if (dialog.ShowModal() == wxID_CANCEL) return;
+
+  wxXmlDocument doc = serializer.DecompressXml(dialog.GetPath());
+  if (!doc.IsOk())
+  {
+    wxMessageBox("Failed to load file");
+    return;
+  }
+
+  canvas->SetSquiggles(serializer.DeserializePaths(doc));
+}
+
+void Frame::SaveToXml()
+{
+  wxFileDialog dialog(this, "Save As", "", "", "PXZ files (*.pxz)|*.pxz", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+  if (dialog.ShowModal() == wxID_CANCEL) return;
+
+  auto doc = serializer.SerializePaths(canvas->GetSquiggles());
+  serializer.CompressXml(doc, dialog.GetPath());
 }

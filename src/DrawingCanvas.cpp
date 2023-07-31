@@ -20,6 +20,41 @@ DrawingCanvas::DrawingCanvas(wxWindow* parent)
   this->Bind(wxEVT_CONTEXT_MENU, &DrawingCanvas::OnContextMenuEvent, this);
 }
 
+void DrawingCanvas::ShowExportDialog()
+{
+  wxFileDialog exportFileDialog(this, _("Export drawing"), "", "", "PNG files (*.png)|*.png", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+  if (exportFileDialog.ShowModal() == wxID_CANCEL) return;
+
+  wxBitmap bitmap(this->GetSize() * this->GetContentScaleFactor());
+
+  wxMemoryDC memDC;
+  memDC.SetUserScale(this->GetContentScaleFactor(), this->GetContentScaleFactor());
+  memDC.SelectObject(bitmap);
+  memDC.Clear();
+
+  wxGraphicsContext* gc = wxGraphicsContext::Create(memDC);
+  if (gc)
+  {
+    DrawOnContext(gc);
+    delete gc;
+  }
+
+  bitmap.SaveFile(exportFileDialog.GetPath(), wxBITMAP_TYPE_PNG);
+}
+
+void DrawingCanvas::DrawOnContext(wxGraphicsContext* gc)
+{
+  for (const auto &s : squiggles)
+    {
+      auto pointsVector = s.points;
+      if (pointsVector.size() > 1)
+      {
+        gc->SetPen(wxPen(s.color, s.width));
+        gc->StrokeLines(pointsVector.size(), pointsVector.data());
+      }
+    }
+}
+
 void DrawingCanvas::OnPaint(wxPaintEvent&)
 {
   wxAutoBufferedPaintDC dc(this);
